@@ -1,0 +1,243 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  projects      Project[]
+  messages      Message[]
+  snapshots     Snapshot[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================================
+// PROJECTS
+// ============================================================
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  language    String   @default("javascript")
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  files           File[]
+  messages        Message[]
+  snapshots       Snapshot[]
+  sandboxSessions SandboxSession[]
+
+  @@index([userId])
+  @@map("projects")
+}
+
+// ============================================================
+// FILE TREE
+// ============================================================
+
+model File {
+  id        String   @id @default(cuid())
+  name      String
+  path      String
+  content   String?  @db.Text
+  mimeType  String   @default("text/plain")
+  size      Int      @default(0)
+  isDir     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  parentId String?
+  parent   File?   @relation("FileTree", fields: [parentId], references: [id])
+  children File[]  @relation("FileTree")
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@map("files")
+}
+
+// ============================================================
+// AI CHAT
+// ============================================================
+
+model Message {
+  id        String      @id @default(cuid())
+  role      MessageRole
+  content   String      @db.Text
+  tokens    Int?
+  createdAt DateTime    @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ============================================================
+// SNAPSHOTS
+// ============================================================
+
+model Snapshot {
+  id         String   @id @default(cuid())
+  label      String?
+  storageKey String
+  sizeBytes  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("snapshots")
+}
+
+// ============================================================
+// SANDBOX SESSIONS (E2B)
+// ============================================================
+
+model SandboxSession {
+  id       String        @id @default(cuid())
+  e2bId   String        @unique
+  status   SandboxStatus @default(RUNNING)
+  language String        @default("python")
+  startedAt DateTime     @default(now())
+  endedAt   DateTime?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  executions CodeExecution[]
+
+  @@index([projectId])
+  @@map("sandbox_sessions")
+}
+
+enum SandboxStatus {
+  RUNNING
+  STOPPED
+  TIMEOUT
+  ERROR
+}
+
+model CodeExecution {
+  id         String   @id @default(cuid())
+  code       String   @db.Text
+  stdout     String?  @db.Text
+  stderr     String?  @db.Text
+  exitCode   Int?
+  durationMs Int?
+  executedAt DateTime @default(now())
+
+  sandboxSessionId String
+  sandboxSession   SandboxSession @relation(fields: [sandboxSessionId], references: [id], onDelete: Cascade)
+
+  @@index([sandboxSessionId])
+  @@map("code_executions")
+}
+
+// ============================================================
+// BACKGROUND JOBS (BullMQ audit log)
+// ============================================================
+
+model Job {
+  id          String    @id @default(cuid())
+  queue       String
+  payload     Json
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([queue, status])
+  @@map("jobs")
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
