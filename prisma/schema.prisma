@@ -11,9 +11,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================================
-// AUTH
-// ============================================================
 
 model User {
   id            String    @id @default(cuid())
@@ -73,9 +70,6 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// ============================================================
-// PROJECTS
-// ============================================================
 
 model Project {
   id          String   @id @default(cuid())
@@ -98,9 +92,6 @@ model Project {
   @@map("projects")
 }
 
-// ============================================================
-// FILE TREE
-// ============================================================
 
 model File {
   id        String   @id @default(cuid())
@@ -125,9 +116,6 @@ model File {
   @@map("files")
 }
 
-// ============================================================
-// AI CHAT
-// ============================================================
 
 model Message {
   id        String      @id @default(cuid())
@@ -152,9 +140,7 @@ enum MessageRole {
   SYSTEM
 }
 
-// ============================================================
-// SNAPSHOTS
-// ============================================================
+
 
 model Snapshot {
   id         String   @id @default(cuid())
@@ -173,9 +159,7 @@ model Snapshot {
   @@map("snapshots")
 }
 
-// ============================================================
-// SANDBOX SESSIONS (E2B)
-// ============================================================
+
 
 model SandboxSession {
   id       String        @id @default(cuid())
@@ -217,9 +201,6 @@ model CodeExecution {
   @@map("code_executions")
 }
 
-// ============================================================
-// BACKGROUND JOBS (BullMQ audit log)
-// ============================================================
 
 model Job {
   id          String    @id @default(cuid())
